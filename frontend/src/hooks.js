@@ -71,31 +71,21 @@ export const useAuth = () => {
   return { user, loading, error, register, login, logout };
 };
 
-// Theme hook - supports dark, light, and ultra-light modes
+// Theme hook - now uses context to share state
+import { useContext } from 'react';
+import { ThemeContext } from './ThemeContext';
+
 export const useTheme = () => {
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
-
-  useEffect(() => {
-    const root = document.documentElement;
-    // Remove all theme classes
-    root.classList.remove('dark', 'light', 'ultra-light');
-    // Add the current theme
-    root.classList.add(theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const nextTheme = () => {
-    const themes = ['dark', 'light', 'ultra-light'];
-    const currentIndex = themes.indexOf(theme);
-    const nextIndex = (currentIndex + 1) % themes.length;
-    setTheme(themes[nextIndex]);
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  const { theme, changeTheme } = context;
+  return { 
+    theme, 
+    setTheme: changeTheme,
+    isDark: theme === 'dark' 
   };
-
-  return { theme, setTheme, nextTheme, isDark: theme === 'dark' };
 };
 
 // Fetch data hook
