@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
@@ -335,6 +335,28 @@ def delete_credit_card(card_id):
     db.session.commit()
     
     return jsonify({'success': True}), 200
+
+
+# ============== Frontend Static Files ==============
+
+@app.route('/')
+def serve_react_root():
+    """Serve the main React app"""
+    static_folder = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(static_folder, 'index.html')
+
+
+@app.route('/<path:path>')
+def serve_react_files(path):
+    """Serve React static files, fallback to index.html for SPA routing"""
+    static_folder = os.path.join(os.path.dirname(__file__), 'static')
+    
+    # Check if file exists in static folder
+    if os.path.exists(os.path.join(static_folder, path)):
+        return send_from_directory(static_folder, path)
+    
+    # For any non-existent routes, serve index.html (React router will handle)
+    return send_from_directory(static_folder, 'index.html')
 
 
 # ============== Health Check ==============

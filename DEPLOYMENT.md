@@ -135,11 +135,101 @@ pip install flask-cors
 
 ## Part 2: Deploy Frontend on PythonAnywhere
 
+### IMPORTANT: Build Frontend Locally First
+
+**The `npm` command is NOT available on PythonAnywhere** - this is normal and expected. You must build the frontend on your local machine before deploying.
+
+#### Step 1: Build React Locally
+
+On your **local machine** (NOT on PythonAnywhere), run:
+
+```bash
+cd ~/budgeting-app/frontend
+npm install  # Only needed if you haven't run this yet
+npm run build
+```
+
+This creates a `dist/` folder with optimized static files ready for production.
+
+#### Step 2: Copy Built Files to Backend
+
+Still on your **local machine**, copy the built frontend to the backend static folder:
+
+```bash
+mkdir -p ~/budgeting-app/backend/static
+cp -r ~/budgeting-app/frontend/dist/* ~/budgeting-app/backend/static/
+```
+
+#### Step 3: Commit & Push to GitHub
+
+```bash
+cd ~/budgeting-app
+git add backend/static/
+git commit -m "Add built frontend static files"
+git push origin main
+```
+
+#### Step 4: Pull on PythonAnywhere
+
+In your PythonAnywhere Bash console:
+
+```bash
+cd ~/budgeting-app
+git pull origin main
+```
+
+#### Step 5: No Web App Restart Needed
+
+The Flask app is already configured to serve these static files, so just ensure your web app is reloaded (see troubleshooting below).
+
+---
+
+## Troubleshooting
+
+### Health Check Not Responding (`/api/health`)
+
+1. **Check your WSGI configuration:**
+   - Go to **Web** tab → Your web app → **WSGI configuration file**
+   - Verify the path `/home/yourusername/budgeting-app/backend` is correct
+   - Verify `yourusername` is your actual PythonAnywhere username
+
+2. **Reload your web app:**
+   - Go to **Web** tab → Click **Reload** button
+   - Wait for the green checkmark
+
+3. **Check for errors:**
+   - Go to **Web** tab → Look at **Error log** (last line shows latest errors)
+   - Common issues:
+     - `ModuleNotFoundError`: Missing dependency - run `pip install -r requirements.txt` in venv
+     - `No module named 'models'`: Wrong WSGI path - should be `/home/yourusername/budgeting-app/backend`
+     - Database errors: Check that SQLite can write to the directory
+
+4. **Test the endpoint:**
+   - In your browser, visit: `https://yourusername.pythonanywhere.com/api/health`
+   - Should return: `{"status":"ok"}`
+
+### Frontend Not Loading
+
+1. **Verify static files were copied:**
+   ```bash
+   ls -la ~/budgeting-app/backend/static/
+   ```
+   Should show `index.html` and other files
+
+2. **Check index.html exists:**
+   ```bash
+   file ~/budgeting-app/backend/static/index.html
+   ```
+
+3. **Reload web app** and check error log
+
+---
+
 ### Option 1: Serve React from Static Files (Recommended)
 
 This serves the React build as static files from the same PythonAnywhere server.
 
-#### Step 1: Build React for Production
+#### Step 1: Build React for Production (on your local machine)
 
 ```bash
 cd ~/budgeting-app/frontend
@@ -148,46 +238,33 @@ npm run build
 
 This creates `frontend/dist/` folder with all static files.
 
-#### Step 2: Copy Frontend to Static Directory
-
-Create a static folder in your project and copy the built files:
-
-```bash
-mkdir -p ~/budgeting-app/backend/static
-cp -r ~/budgeting-app/frontend/dist/* ~/budgeting-app/backend/static/
-```
+#### Step 2: Copy Frontend to Static Directory (on your local machine
 
 #### Step 3: Update Flask to Serve Static Files
 
-Add this to your Flask `app.py`:
+**Already done!** Your `app.py` is configured to serve React:
 
 ```python
-from flask import Flask, send_from_directory
-import os
-
-# ... existing code ...
-
-# Serve React frontend
 @app.route('/')
 def serve_react_root():
-    return send_from_directory('static', 'index.html')
+    """Serve the main React app"""
+    static_folder = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(static_folder, 'index.html')
 
 @app.route('/<path:path>')
-def serve_react(path):
-    if path != "" and os.path.exists(os.path.join('static', path)):
-        return send_from_directory('static', path)
-    else:
-        return send_from_directory('static', 'index.html')
-
-# Your API routes...
-@app.route('/api/...', methods=['GET', 'POST'])
-def api_endpoint():
-    # ... your code ...
+def serve_react_files(path):
+    """Serve React static files, fallback to index.html for SPA routing"""
+    static_folder = os.path.join(os.path.dirname(__file__), 'static')
+    if os.path.exists(os.path.join(static_folder, path)):
+        return send_from_directory(static_folder, path)
+    return send_from_directory(static_folder, 'index.html')
 ```
+
+No additional changes needed to `app.py`.
 
 #### Step 4: Update Frontend API URL
 
-Edit `frontend/src/api.js`:
+Edit [frontend/src/api.js](frontend/src/api.js):
 
 ```javascript
 const API_BASE = import.meta.env.DEV 
